@@ -20,14 +20,14 @@ args = vars(ap.parse_args())
 ref = cv2.imread(args["reference"])
 ref = imutils.resize(ref, width=100)
 
-cv2.imshow("Raw", ref);
-cv2.waitKey(0);
+#cv2.imshow("Raw", ref);
+#cv2.waitKey(0);
 
 ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
 ref = cv2.threshold(ref, 10, 255, cv2.THRESH_BINARY_INV)[1]
 
-cv2.imshow("Gray", ref);
-cv2.waitKey(0);
+#cv2.imshow("Gray", ref);
+#cv2.waitKey(0);
 
 
 # find contours in the OCR-A image (i.e,. the outlines of the digits)
@@ -61,15 +61,15 @@ sqKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 image = cv2.imread(args["image"])
 image = imutils.resize(image, width=600)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-cv2.imshow("Image", gray)
-cv2.waitKey(0)
+#cv2.imshow("Image", gray)
+#cv2.waitKey(0)
 
 
 # apply a tophat (whitehat) morphological operator to find light
 # regions against a dark background (i.e., the credit card numbers)
 tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, rectKernel)
-cv2.imshow("Tophat", tophat)
-cv2.waitKey(0)
+#cv2.imshow("Tophat", tophat)
+#cv2.waitKey(0)
 
 # compute the Scharr gradient of the tophat image, then scale
 # the rest back into the range [0, 255]
@@ -79,8 +79,8 @@ gradX = np.absolute(gradX)
 (minVal, maxVal) = (np.min(gradX), np.max(gradX))
 gradX = (255 * ((gradX - minVal) / (maxVal - minVal)))
 gradX = gradX.astype("uint8")
-cv2.imshow("GradX", gradX)
-cv2.waitKey(0)
+#cv2.imshow("GradX", gradX)
+#cv2.waitKey(0)
 
 
 # apply a closing operation using the rectangular kernel to help
@@ -89,8 +89,8 @@ cv2.waitKey(0)
 gradX = cv2.morphologyEx(gradX, cv2.MORPH_CLOSE, rectKernel)
 thresh = cv2.threshold(gradX, 0, 255,
 	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-cv2.imshow("Thresh", thresh)
-cv2.waitKey(0)
+#cv2.imshow("Thresh", thresh)
+#cv2.waitKey(0)
 
 
 # apply a second closing operation to the binary image, again
@@ -144,29 +144,30 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
     # then apply thresholding to segment the digits from the
     # background of the credit card
     group = gray[gY - 5:gY + gH + 5, gX - 5:gX + gW + 5]
-    cv2.imshow("group" + str(i), group)
-    cv2.waitKey(0)
+    #cv2.imshow("group" + str(i), group)
+    #cv2.waitKey(0)
     group = cv2.threshold(group, 0, 255,
     	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     cv2.imshow("group threshed" + str(i), group)
     cv2.waitKey(0)
+
     # detect the contours of each individual digit in the group,
     # then sort the digit contours from left to right
-    digitCnts = cv2.findContours(group.copy(), cv2.RETR_EXTERNAL,
+    digitCnts = cv2.findContours(group.copy(), cv2.RETR_LIST,
     	cv2.CHAIN_APPROX_SIMPLE)
     digitCnts = digitCnts[0] if imutils.is_cv2() else digitCnts[1]
     digitCnts = contours.sort_contours(digitCnts,
-    	method="top-to-bottom")[0]
+    	method="left-to-right")[0]
         	# loop over the digit contours
     for c in digitCnts:
-        # compute the bounding box of the individual digit, extract
-        # the digit, and resize it to have the same fixed size as
-        # the reference OCR-A images
+        # Bounding Rectangle of an area found in the ID.
         (x, y, w, h) = cv2.boundingRect(c)
         roi = group[y:y + h, x:x + w]
-        cv2.imshow("roi :" + str(c), roi)
-        cv2.waitKey(0)
+        #cv2.imshow("roi :" + str(c), roi)
+        #cv2.waitKey(0)
+
         roi = cv2.resize(roi, (57, 88))
+
         #cv2.imshow("roi :" + str(c), roi)
         #cv2.waitKey(0)
 
