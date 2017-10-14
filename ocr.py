@@ -36,7 +36,7 @@ cv2.waitKey(0);
 refCnts = cv2.findContours(ref.copy(), cv2.RETR_EXTERNAL,
 	cv2.CHAIN_APPROX_SIMPLE)
 refCnts = refCnts[0] if imutils.is_cv2() else refCnts[1]
-refCnts = contours.sort_contours(refCnts, method="left-to-right")[0]
+refCnts = contours.sort_contours(refCnts, method="top-to-bottom")[0]
 digits = {}
 
 
@@ -128,9 +128,9 @@ for (i, c) in enumerate(cnts):
         locs.append((x, y, w, h))
 
 
-# sort the digit locations from left-to-right, then initialize the
+# sort the digit locations from top-to-bottom, then initialize the
 # list of classified digits
-locs = sorted(locs, key=lambda x:x[0])
+locs = sorted(locs, key=lambda x:x[1])
 output = []
 
 
@@ -148,7 +148,8 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
     cv2.waitKey(0)
     group = cv2.threshold(group, 0, 255,
     	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
+    cv2.imshow("group threshed" + str(i), group)
+    cv2.waitKey(0)
     # detect the contours of each individual digit in the group,
     # then sort the digit contours from left to right
     digitCnts = cv2.findContours(group.copy(), cv2.RETR_EXTERNAL,
@@ -163,9 +164,11 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
         # the reference OCR-A images
         (x, y, w, h) = cv2.boundingRect(c)
         roi = group[y:y + h, x:x + w]
-        roi = cv2.resize(roi, (57, 88))
         cv2.imshow("roi :" + str(c), roi)
         cv2.waitKey(0)
+        roi = cv2.resize(roi, (57, 88))
+        #cv2.imshow("roi :" + str(c), roi)
+        #cv2.waitKey(0)
 
         # initialize a list of template matching scores
         scores = []
