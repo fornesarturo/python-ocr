@@ -9,7 +9,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=False,
 	help="path to input image")
 ap.add_argument("-r", "--reference", required=False,
-	help="path to reference OCR-A image")
+	help="path to reference OCR-A image", default='./ocr-a.jpg')
 args = vars(ap.parse_args())
 
 
