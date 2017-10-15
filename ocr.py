@@ -1,3 +1,5 @@
+from skimage.filters import threshold_local
+from transform import four_point_transform
 from imutils import contours
 from PIL import Image
 import pytesseract
@@ -7,6 +9,71 @@ import imutils
 import cv2
 import os
 
+def imWarped(image, debug=False):
+	# load the image and compute the ratio of the old height
+	# to the new height, clone it, and resize it
+	ratio = image.shape[0] / 500.0
+	orig = image.copy()
+	image = imutils.resize(image, height = 500)
+
+	# convert the image to grayscale, blur it, and find edges
+	# in the image
+	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	gray = cv2.GaussianBlur(gray, (5, 5), 0)
+	edged = cv2.Canny(gray, 75, 200)
+
+	# show the original image and the edge detected image
+	if debug:
+		print("STEP 1: Edge Detection")
+		cv2.imshow("Image", image)
+		cv2.imshow("Edged", edged)
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()
+
+	# find the contours in the edged image, keeping only the
+	# largest ones, and initialize the screen contour
+	_, cnts, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+	cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]
+
+	# loop over the contours
+	for c in cnts:
+		# approximate the contour
+		peri = cv2.arcLength(c, True)
+		approx = cv2.approxPolyDP(c, 0.1 * peri, True)
+
+		# if our approximated contour has four points, then we
+		# can assume that we have found our screen
+		if len(approx) == 4:
+			screenCnt = approx
+			break
+
+	# show the contour (outline) of the piece of paper
+	if debug:
+		print("STEP 2: Find contours of paper")
+		cv2.drawContours(image, [screenCnt], -1, (0, 255, 0), 2)
+		cv2.imshow("Outline", image)
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()
+
+	# apply the four point transform to obtain a top-down
+	# view of the original image
+	warped = four_point_transform(orig, screenCnt.reshape(4, 2) * ratio)
+
+	# convert the warped image to grayscale, then threshold it
+	# to give it that 'black and white' paper effect
+	# warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+	# warped = threshold_local(warped, 251, offset = 10)
+	# warped = warped.astype("uint8") * 255
+
+	# show the original and scanned images
+	if debug:
+		print("STEP 3: Apply perspective transform")
+		cv2.destroyAllWindows()
+		cv2.imshow("Scanned", imutils.resize(warped, height = 650))
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()
+	return warped
+
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
@@ -14,7 +81,6 @@ ap.add_argument("-i", "--image", required=True,
 ap.add_argument("-r", "--reference", required=False,
 	help="path to reference OCR-A image", default='./ocr-a.jpg')
 args = vars(ap.parse_args())
-
 
 # load the reference OCR-A image from disk, convert it to grayscale,
 # and threshold it, such that the digits appear as *white* on a
@@ -35,7 +101,6 @@ refCnts = refCnts[0] if imutils.is_cv2() else refCnts[1]
 refCnts = contours.sort_contours(refCnts, method="top-to-bottom")[0]
 digits = {}
 
-
 # loop over the OCR-A reference contours
 for (i, c) in enumerate(refCnts):
 	# compute the bounding box for the digit, extract it, and resize
@@ -55,17 +120,17 @@ sqKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 
 # load the input image, resize it, and convert it to grayscale
 image = cv2.imread(args["image"])
+image = imWarped(image)
 image = imutils.resize(image, width=600)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-#cv2.imshow("Image", gray)
-#cv2.waitKey(0)
-
+cv2.imshow("Gray", gray)
+cv2.waitKey(0)
 
 # apply a tophat (whitehat) morphological operator to find light
 # regions against a dark background (i.e., the text areas)
 tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, rectKernel)
-#cv2.imshow("Tophat", tophat)
-#cv2.waitKey(0)
+cv2.imshow("Tophat", tophat)
+cv2.waitKey(0)
 
 # compute the Scharr gradient of the tophat image, then scale
 # the rest back into the range [0, 255]
@@ -83,8 +148,8 @@ gradX = gradX.astype("uint8")
 gradX = cv2.morphologyEx(gradX, cv2.MORPH_CLOSE, rectKernel)
 thresh = cv2.threshold(gradX, 0, 255,
 	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-#cv2.imshow("Thresh", thresh)
-#cv2.waitKey(0)
+cv2.imshow("Thresh", thresh)
+cv2.waitKey(0)
 
 
 # apply a second closing operation to the binary image, again
@@ -114,7 +179,33 @@ for (i, c) in enumerate(cnts):
 locs = sorted(locs, key=lambda x:x[1])
 output = []
 
+# NAME_ROI = (187, 108, 256, 37)
+# ADDR_ROI = (187, 166, 277, 75)
+# CURP_ROI = (229, 262, 170, 26)
+# BRDY_ROI = (485, 102, 95, 20)
+# SEX_ROI = (558, 123, 23, 19)
+NAME_ROI = (186, 108, 255, 56)
+ADDR_ROI = (182, 179, 281, 61)
+CURP_ROI = (226, 265, 170, 20)
+BRDY_ROI = (487, 106, 81, 16)
+SEX_ROI = (524, 122, 64, 26)
 
+# Uncomment to recalculate ROIs from ID
+# fromCenter = False
+# NAME_ROI = cv2.selectROI("Image", tophat, fromCenter)
+# ADDR_ROI = cv2.selectROI("Image", tophat, fromCenter)
+# CURP_ROI = cv2.selectROI("Image", tophat, fromCenter)
+# BRDY_ROI = cv2.selectROI("Image", tophat, fromCenter)
+# SEX_ROI  = cv2.selectROI("Image", tophat, fromCenter)
+# print('NAME_ROI = ' + str(NAME_ROI))
+# print('ADDR_ROI = ' + str(ADDR_ROI))
+# print('CURP_ROI = ' + str(CURP_ROI))
+# print('BRDY_ROI = ' + str(BRDY_ROI))
+# print('SEX_ROI = ' + str(SEX_ROI))
+# exit()
+
+locs = [NAME_ROI, ADDR_ROI, CURP_ROI, BRDY_ROI, SEX_ROI]
+locs = sorted(locs, key=lambda x:x[1])
 """
 Each rectangle (area of text)
 """
