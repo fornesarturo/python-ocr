@@ -1,5 +1,3 @@
-from skimage.filters import threshold_local
-from transform import four_point_transform
 from imutils import contours
 from PIL import Image
 import pytesseract
@@ -61,9 +59,6 @@ def imWarped(image, debug=False):
 
 	# convert the warped image to grayscale, then threshold it
 	# to give it that 'black and white' paper effect
-	# warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-	# warped = threshold_local(warped, 251, offset = 10)
-	# warped = warped.astype("uint8") * 255
 
 	# show the original and scanned images
 	if debug:
@@ -174,7 +169,6 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
     print("text spa: %s \ntext spa.news-gothic: %s \ntext eng: %s\n" % (text_default, text, text_eng))
     cv2.imshow("group threshed" + str(i), group)
     cv2.waitKey(0)
-
 
 # display the output credit card information to the screen
 # print("OCR: {}".format("".join(output)))
