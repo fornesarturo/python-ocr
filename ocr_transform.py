@@ -1,3 +1,4 @@
+from transform import four_point_transform
 from imutils import contours
 from PIL import Image
 import pytesseract
@@ -16,9 +17,11 @@ def imWarped(image, debug=False):
 
 	# convert the image to grayscale, blur it, and find edges
 	# in the image
+
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	gray = cv2.GaussianBlur(gray, (5, 5), 0)
-	edged = cv2.Canny(gray, 75, 200)
+	thresh = cv2.threshold(gray, 0, 255,
+		cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+	edged = cv2.Canny(thresh, 75, 200)
 
 	# show the original image and the edge detected image
 	if debug:
@@ -82,7 +85,7 @@ sqKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 
 # load the input image, resize it, and convert it to grayscale
 image = cv2.imread(args["image"])
-image = imWarped(image)
+image = imWarped(image, debug=True)
 image = imutils.resize(image, width=600)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 cv2.imshow("Gray", gray)

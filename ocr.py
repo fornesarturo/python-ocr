@@ -1,15 +1,18 @@
 from imutils import contours
+from PIL import Image
+import pytesseract
 import numpy as np
 import argparse
 import imutils
 import cv2
+import os
 
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
 	help="path to input image")
 ap.add_argument("-r", "--reference", required=False,
-	help="path to reference OCR-A image")
+	help="path to reference OCR-A image", default='./ocr-a.jpg')
 args = vars(ap.parse_args())
 
 
@@ -18,11 +21,10 @@ args = vars(ap.parse_args())
 # *black* background
 # and invert it, such that the digits appear as *white* on a *black*
 ref = cv2.imread(args["reference"])
-ref = imutils.resize(ref, width=100)
+# ref = imutils.resize(ref, width=100)
 
 ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
 ref = cv2.threshold(ref, 10, 255, cv2.THRESH_BINARY_INV)[1]
-
 
 # find contours in the OCR-A image (i.e,. the outlines of the digits)
 # sort them from left to right, and initialize a dictionary to map
@@ -113,7 +115,6 @@ locs = sorted(locs, key=lambda x:x[1])
 output = []
 
 
-# loop over the 4 groupings of 4 digits
 """
 Each rectangle (area of text)
 """
@@ -127,71 +128,24 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
     #cv2.waitKey(0)
     group = cv2.threshold(group, 0, 255,
     	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    # write the image to disk as a temporary file so we can
+    # apply OCR to it
+    filename = "{}.png".format(os.getpid())
+    cv2.imwrite(filename, group)
+
+    # load the image as a PIL/Pillow image, apply OCR, and then delete
+    # the temporary file
+    text = pytesseract.image_to_string(Image.open(filename), lang='news-gothic-light')
+    text_default = pytesseract.image_to_string(Image.open(filename), lang='spa')
+    text_eng = pytesseract.image_to_string(Image.open(filename))
+    os.remove(filename)
+    print("text spa: %s \ntext spa.news-gothic: %s \ntext eng: %s\n" % (text_default, text, text_eng))
     cv2.imshow("group threshed" + str(i), group)
     cv2.waitKey(0)
 
 
-    """
-    Each letter for every section
-    """
-    digitCnts = cv2.findContours(group.copy(), cv2.RETR_LIST,
-    	cv2.CHAIN_APPROX_SIMPLE)
-    digitCnts = digitCnts[0] if imutils.is_cv2() else digitCnts[1]
-
-    # Get Contours that could be letters based on size
-    actualLetters = []
-    for (index, possibleLetter) in enumerate(digitCnts):
-        (x, y, w, h) = cv2.boundingRect(possibleLetter)
-        if (h > 5):
-            actualLetters.append(possibleLetter)
-
-    digitCnts = contours.sort_contours(actualLetters,
-    	method="left-to-right")[0]
-
-    # Try to match the letter to the template.
-    for c in digitCnts:
-        # Bounding Rectangle of an area found in the ID.
-        (x, y, w, h) = cv2.boundingRect(c)
-        roi = group[y:y + h, x:x + w]
-        #cv2.imshow("roi :" + str(c), roi)
-        #cv2.waitKey(0)
-
-        roi = cv2.resize(roi, (57, 88))
-
-        #cv2.imshow("roi :" + str(c), roi)
-        #cv2.waitKey(0)
-
-        # initialize a list of template matching scores
-        scores = []
-
-
-        # loop over the reference name and ROI
-        for (digit, digitROI) in digits.items():
-        	# apply correlation-based template matching, take the
-        	# score, and update the scores list
-        	result = cv2.matchTemplate(roi, digitROI,
-        		cv2.TM_CCOEFF)
-        	(_, score, _, _) = cv2.minMaxLoc(result)
-        	scores.append(score)
-
-        # the classification for the digit ROI will be the reference
-        # digit name with the *largest* template matching score
-        groupOutput.append(str(np.argmax(scores)))
-    """END
-    Each letter for every section
-    """
-
-    # draw the digit classifications around the group
-    cv2.rectangle(image, (gX - 5, gY - 5),
-    	(gX + gW + 5, gY + gH + 5), (0, 0, 255), 2)
-    cv2.putText(image, "".join(groupOutput), (gX, gY - 15),
-    	cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
-
-    # update the output digits list
-    output.extend(groupOutput)
-
-
 # display the output credit card information to the screen
-print("OCR: {}".format("".join(output)))
+# print("OCR: {}".format("".join(output)))
 cv2.imshow("Image", image)
 cv2.waitKey(0)
