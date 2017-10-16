@@ -8,9 +8,8 @@ import cv2
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=False,
 	help="path to input image")
-ap.add_argument("-r", "--reference", required=True,
-	help="path to reference OCR-A image")
-args = vars(ap.parse_args())
+ap.add_argument("-r", "--reference", required=False,
+	help="path to reference OCR-A image", default='./ocr-a.jpg')
 
 
 # load the reference OCR-A image from disk, convert it to grayscale,
