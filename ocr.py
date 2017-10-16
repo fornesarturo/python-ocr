@@ -136,7 +136,7 @@ for (i, (gX, gY, gW, gH)) in enumerate(locs):
 
     # load the image as a PIL/Pillow image, apply OCR, and then delete
     # the temporary file
-    text = pytesseract.image_to_string(Image.open(filename), lang='news-gothic-light')
+    text = pytesseract.image_to_string(Image.open(filename), lang='spa.news-gothic-light')
     text_default = pytesseract.image_to_string(Image.open(filename), lang='spa')
     text_eng = pytesseract.image_to_string(Image.open(filename))
     os.remove(filename)

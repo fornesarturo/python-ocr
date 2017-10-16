@@ -1,5 +1,6 @@
 from transform import four_point_transform
 from imutils import contours
+from pprint import pprint
 from PIL import Image
 import pytesseract
 import numpy as np
@@ -13,15 +14,14 @@ def imWarped(image, debug=False):
 	# to the new height, clone it, and resize it
 	ratio = image.shape[0] / 500.0
 	orig = image.copy()
-	image = imutils.resize(image, height = 500)
+	image = imutils.resize(image, height = 1000)
 
 	# convert the image to grayscale, blur it, and find edges
 	# in the image
 
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	thresh = cv2.threshold(gray, 0, 255,
-		cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-	edged = cv2.Canny(thresh, 75, 200)
+	# gray = cv2.GaussianBlur(gray, (1, 1), 0)
+	edged = cv2.Canny(gray, 75, 200)
 
 	# show the original image and the edge detected image
 	if debug:
@@ -75,72 +75,36 @@ def imWarped(image, debug=False):
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
-	help="path to input image")
+	help="path to input image", default="ine.jpg")
+ap.add_argument("-m", "--manual", required=False,
+	help="manually select ROIs", default=False, action="store_true")
 args = vars(ap.parse_args())
-
-# initialize a rectangular (wider than it is tall) and square
-# structuring kernel
-rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
-sqKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 
 # load the input image, resize it, and convert it to grayscale
 image = cv2.imread(args["image"])
-image = imWarped(image, debug=True)
-image = imutils.resize(image, width=600)
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-cv2.imshow("Gray", gray)
-cv2.waitKey(0)
+# image = imWarped(image, debug=True)
+image = imutils.resize(image, height = 1000)
+# image = cv2.GaussianBlur(image, (5, 5), 0)
 
-# apply a tophat (whitehat) morphological operator to find light
-# regions against a dark background (i.e., the text areas)
-tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, rectKernel)
-cv2.imshow("Tophat", tophat)
-cv2.waitKey(0)
+NAME_ROI = (519, 296, 626, 162)
+ADDR_ROI = (510, 489, 794, 181)
+CURP_ROI = (605, 715, 467, 71)
+BRDY_ROI = (1301, 301, 233, 52)
+SEX_ROI = (1373, 355, 176, 59)
 
-# compute the Scharr gradient of the tophat image, then scale
-# the rest back into the range [0, 255]
-gradX = cv2.Sobel(tophat, ddepth=cv2.CV_32F, dx=1, dy=0,
-	ksize=-1)
-gradX = np.absolute(gradX)
-(minVal, maxVal) = (np.min(gradX), np.max(gradX))
-gradX = (255 * ((gradX - minVal) / (maxVal - minVal)))
-gradX = gradX.astype("uint8")
-
-
-# apply a closing operation using the rectangular kernel to help
-# cloes gaps in between letters, then apply
-# Otsu's thresholding method to binarize the image
-gradX = cv2.morphologyEx(gradX, cv2.MORPH_CLOSE, rectKernel)
-thresh = cv2.threshold(gradX, 0, 255,
-	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-cv2.imshow("Thresh", thresh)
-cv2.waitKey(0)
-
-
-# apply a second closing operation to the binary image, again
-# to help close gaps between credit card number regions
-# thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, sqKernel)
-# cv2.imshow("Thresh-2", thresh)
-# cv2.waitKey(0)
-
-NAME_ROI = (186, 108, 255, 56)
-ADDR_ROI = (182, 179, 281, 61)
-CURP_ROI = (226, 265, 170, 20)
-BRDY_ROI = (487, 106, 81, 16)
-SEX_ROI = (524, 122, 64, 26)
-
-# Uncomment to recalculate ROIs from ID
-# fromCenter = False
-# NAME_ROI = cv2.selectROI("Image", tophat, fromCenter)
-# ADDR_ROI = cv2.selectROI("Image", tophat, fromCenter)
-# CURP_ROI = cv2.selectROI("Image", tophat, fromCenter)
-# BRDY_ROI = cv2.selectROI("Image", tophat, fromCenter)
-# SEX_ROI  = cv2.selectROI("Image", tophat, fromCenter)
-# print('NAME_ROI = ' + str(NAME_ROI))
-# print('ADDR_ROI = ' + str(ADDR_ROI))
-# print('CURP_ROI = ' + str(CURP_ROI))
-# print('BRDY_ROI = ' + str(BRDY_ROI))
-# print('SEX_ROI = ' + str(SEX_ROI))
+if args['manual']:
+	fromCenter = False
+	NAME_ROI = cv2.selectROI("Name ROI", image, fromCenter)
+	ADDR_ROI = cv2.selectROI("ADDR_ROI", image, fromCenter)
+	CURP_ROI = cv2.selectROI("CURP_ROI", image, fromCenter)
+	BRDY_ROI = cv2.selectROI("BRDY_ROI", image, fromCenter)
+	SEX_ROI  = cv2.selectROI("SEX_ROI", image, fromCenter)
+	cv2.destroyAllWindows()
+	print('NAME_ROI = ' + str(NAME_ROI))
+	print('ADDR_ROI = ' + str(ADDR_ROI))
+	print('CURP_ROI = ' + str(CURP_ROI))
+	print('BRDY_ROI = ' + str(BRDY_ROI))
+	print('SEX_ROI = ' + str(SEX_ROI))
 
 locs = [NAME_ROI, ADDR_ROI, CURP_ROI, BRDY_ROI, SEX_ROI]
 locs = sorted(locs, key=lambda x:x[1])
@@ -148,32 +112,45 @@ locs = sorted(locs, key=lambda x:x[1])
 Each rectangle (area of text)
 """
 for (i, (gX, gY, gW, gH)) in enumerate(locs):
-    # initialize the list of group digits
-    groupOutput = []
+	# Extract the rectangle from the gray image
+	group = image[gY - 5:gY + gH + 5, gX - 5:gX + gW + 5]
+	hsv = cv2.cvtColor(group, cv2.COLOR_BGR2HSV)
+	cv2.imshow("field", group)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
+	cv2.imshow("hsv", hsv)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
 
-    # Extract the rectangle from the gray image
-    group = gray[gY - 5:gY + gH + 5, gX - 5:gX + gW + 5]
-    #cv2.imshow("group" + str(i), group)
-    #cv2.waitKey(0)
-    group = cv2.threshold(group, 0, 255,
-    	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+	lower_black = np.array([0, 0, 0])
+	upper_black = np.array([180, 255, 40])
 
-    # write the image to disk as a temporary file so we can
-    # apply OCR to it
-    filename = "{}.png".format(os.getpid())
-    cv2.imwrite(filename, group)
+	mask = cv2.inRange(hsv, lower_black, upper_black)
+	# dilate the mask image
+	kernel = np.ones((1, 1), np.uint8)
+	mask = cv2.erode(mask, kernel, iterations=1)
+	kernel = np.ones((3, 3), np.uint8)
+	mask = cv2.dilate(mask, kernel, iterations=1)
+	cv2.imshow('mask', mask)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
+	res = cv2.bitwise_and(hsv, hsv, mask=mask)
+	cv2.imshow('res', res)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
 
-    # load the image as a PIL/Pillow image, apply OCR, and then delete
-    # the temporary file
-    text = pytesseract.image_to_string(Image.open(filename), lang='spa.news-gothic-light')
-    text_default = pytesseract.image_to_string(Image.open(filename), lang='spa')
-    text_eng = pytesseract.image_to_string(Image.open(filename))
-    os.remove(filename)
-    print("text spa: %s \ntext spa.news-gothic: %s \ntext eng: %s\n" % (text_default, text, text_eng))
-    cv2.imshow("group threshed" + str(i), group)
-    cv2.waitKey(0)
+	# write the image to disk as a temporary file so we can
+	# apply OCR to it
+	filename = "{}.png".format(os.getpid())
+	cv2.imwrite(filename, mask)
 
-# display the output credit card information to the screen
-# print("OCR: {}".format("".join(output)))
-cv2.imshow("Image", image)
-cv2.waitKey(0)
+	# load the image as a PIL/Pillow image, apply OCR, and then delete
+	# the temporary file
+	text = pytesseract.image_to_string(Image.open(filename), lang='spa.news-gothic-light')
+	text_default = pytesseract.image_to_string(Image.open(filename), lang='spa')
+	text_eng = pytesseract.image_to_string(Image.open(filename))
+	os.remove(filename)
+	print("text spa: %s \ntext spa.news-gothic: %s \ntext eng: %s\n" % (text_default, text, text_eng))
+	cv2.imshow("group threshed" + str(i), mask)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
